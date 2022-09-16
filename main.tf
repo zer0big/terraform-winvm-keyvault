@@ -8,9 +8,9 @@ resource "azurerm_virtual_network" "zero-vnet" {
   location            = azurerm_resource_group.zero-rg.location
   resource_group_name = azurerm_resource_group.zero-rg.name
   address_space       = ["10.0.0.0/16"]
-  # depends_on = [
-  #   azurerm_resource_group.zero-rg
-  # ]
+  depends_on = [
+    azurerm_resource_group.zero-rg
+  ]
 }
 
 resource "azurerm_subnet" "web-subnet" {
@@ -18,6 +18,9 @@ resource "azurerm_subnet" "web-subnet" {
   resource_group_name  = azurerm_resource_group.zero-rg.name
   virtual_network_name = azurerm_virtual_network.zero-vnet.name
   address_prefixes     = ["10.0.1.0/24"]
+  depends_on = [
+    azurerm_virtual_network.zero-vnet
+  ]
 }
 
 resource "azurerm_public_ip" "zero-pip" {
@@ -39,9 +42,10 @@ resource "azurerm_network_interface" "zero-nic" {
     public_ip_address_id          = azurerm_public_ip.zero-pip.id
   }
 
-  # depends_on = [
-  #   azurerm_virtual_network.zero-vnet
-  # ]
+  depends_on = [
+    azurerm_virtual_network.zero-vnet,
+    azurerm_subnet.web-subnet
+  ]
 }
 
 data "azurerm_client_config" "current" {}
@@ -86,9 +90,10 @@ resource "azurerm_windows_virtual_machine" "zero-vm" {
     version   = "latest"
   }
 
-  # depends_on = [
-  #   azurerm_availability_set.zero-as
-  # ]
+  depends_on = [
+    azurerm_network_interface.zero-nic,
+    azurerm_availability_set.zero-as
+  ]
 }
 
 resource "azurerm_managed_disk" "zero-mdisk" {
@@ -113,10 +118,9 @@ resource "azurerm_availability_set" "zero-as" {
   resource_group_name          = azurerm_resource_group.zero-rg.name
   platform_fault_domain_count  = 2
   platform_update_domain_count = 2
-
-  # depends_on = [
-  #   azurerm_windows_virtual_machine.zero-vm
-  # ]
+  depends_on = [
+    azurerm_resource_group.zero-rg
+  ]
 }
 
 resource "azurerm_storage_account" "zero-sa" {
@@ -133,15 +137,21 @@ resource "azurerm_storage_container" "zero-cont" {
   name                  = "data"
   storage_account_name  = azurerm_storage_account.zero-sa.name
   container_access_type = "blob"
+  depends_on = [
+    azurerm_storage_account.zero-sa
+  ]
 }
 
-# Updload the IIS configuration script as a blob to the Azure Storage Account
+# Updload the IIS configuration script as a blob to the Azure Storage Account 
 resource "azurerm_storage_blob" "zero-blob" {
   name                   = "IIS_Config.ps1"
   storage_account_name   = var.storage_account_name
   storage_container_name = azurerm_storage_container.zero-cont.name
   type                   = "Block"
   source                 = "IIS_Config.ps1"
+  depends_on = [
+    azurerm_storage_container.zero-cont
+  ]
 }
 
 resource "azurerm_virtual_machine_extension" "zero-vm_extension" {
@@ -171,7 +181,6 @@ resource "azurerm_network_security_group" "zero-nsg" {
   resource_group_name = azurerm_resource_group.zero-rg.name
 }
 
-## NSG Inbound Rule for AppTier Subnets
 resource "azurerm_network_security_rule" "zero-nsg_rule" {
   for_each                    = local.app_inbound_ports_map
   name                        = "Rule-Port-${each.value}"
@@ -185,6 +194,9 @@ resource "azurerm_network_security_rule" "zero-nsg_rule" {
   destination_address_prefix  = "*"
   resource_group_name         = azurerm_resource_group.zero-rg.name
   network_security_group_name = azurerm_network_security_group.zero-nsg.name
+  depends_on = [
+    azurerm_network_security_group.zero-nsg
+  ]
 }
 
 resource "azurerm_subnet_network_security_group_association" "zero-nsg_association" {

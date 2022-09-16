@@ -8,6 +8,11 @@ variable "location" {
   default = "Korea Central"
 }
 
+variable "virtual_network" {
+  type    = string
+  default = "zero-vnet"
+}
+
 variable "storage_account_name" {
   type    = string
   default = "zerotfsademo"
